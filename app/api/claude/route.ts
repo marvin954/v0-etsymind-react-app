@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       model: anthropic("claude-haiku-4-5"),
       system: fullSystemPrompt,
       prompt: userPrompt,
-      maxTokens: 1000,
+      maxOutputTokens: 1000,
     });
 
     if (!jsonMode) {
