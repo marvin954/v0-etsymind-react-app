@@ -145,6 +145,23 @@ export default function EtsyMindAI() {
   const [orchResult,     setOrchResult]       = useState<unknown>(null);
   const feedRef = useRef<HTMLDivElement>(null);
 
+  const resetAllData = useCallback(() => {
+    if (confirm("⚠️ Are you sure? This will clear all store data, runs, and results.")) {
+      setStoreState(INITIAL_STATE);
+      setRuns([]);
+      setSystemLog([]);
+      setGoal("");
+      setResearchResult(null);
+      setCreatorResult(null);
+      setListingResult(null);
+      setAnalyticsResult(null);
+      setCxResult(null);
+      setOrchResult(null);
+      setExpandedRun(null);
+      log("system", "✓ All data cleared", "info");
+    }
+  }, []);
+
   const log = useCallback((agentId: string, msg: string, type = "info") => {
     setSystemLog(prev => [{ id: Date.now() + Math.random(), agentId, msg, type, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 49)]);
   }, []);
@@ -286,6 +303,7 @@ export default function EtsyMindAI() {
               <span style={{ fontSize: 12, color: "#FB5607" }}>{activeCount} agent{activeCount>1?"s":""} running</span>
             </div>
           )}
+          <button onClick={resetAllData} style={{ background: "#27272722", border: "1px solid #27272744", borderRadius: 8, padding: "6px 12px", fontSize: 12, color: "#999", cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s", textTransform: "uppercase", letterSpacing: 0.5 }} title="Wipe all data, runs, and results">🗑️ Wipe</button>
           <div style={{ display: "flex", gap: 2, background: "#111", borderRadius: 8, padding: 3 }}>
             {["command","agents","store","results","log"].map(t => (
               <button key={t} onClick={() => setTab(t)} style={{ background: tab===t?"#1e1e1e":"none", border: "none", color: tab===t?"#e8e8e8":"#555", borderRadius: 6, padding: "5px 14px", fontSize: 12, cursor: "pointer", fontFamily: "inherit", fontWeight: tab===t?600:400, textTransform: "capitalize", transition: "all 0.15s" }}>{t}</button>
