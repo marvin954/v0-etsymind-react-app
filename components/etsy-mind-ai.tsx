@@ -120,7 +120,7 @@ function RunCard({ run, onExpand, expanded }: { run: Run; onExpand: () => void; 
             </div>
           </div>
           <div style={{ fontSize: 12, color: "#888", marginBottom: run.result ? 6 : 0 }}>{run.task}</div>
-          {run.status === "done" && run.result && expanded && <JsonViewer data={run.result} color={m.color} />}
+          {run.status === "done" && run.result && expanded ? <JsonViewer data={run.result as unknown} color={m.color} /> : null}
           {run.status === "error" && <div style={{ fontSize: 12, color: "#f87171", marginTop: 4 }}>⚠ {run.error}</div>}
         </div>
       </div>
