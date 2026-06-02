@@ -156,20 +156,8 @@ export interface AnalyticsResult {
 }
 
 export const INITIAL_STATE: StoreState = {
-  storeInfo: { 
-    name: "PixelBloom Studio", 
-    niche: "Minimalist Digital Printables", 
-    rating: 4.9, 
-    totalSales: 847 
-  },
-  listings: [
-    { id: "L001", title: "Minimalist 2026 Daily Planner PDF", price: "$5.99", status: "active", views: 1240, sales: 89 },
-    { id: "L002", title: "Botanical Wall Art Set - 6 Prints", price: "$7.99", status: "active", views: 890, sales: 63 },
-    { id: "L003", title: "Budget Tracker Spreadsheet Template", price: "$4.99", status: "active", views: 540, sales: 31 },
-  ],
-  messages: [
-    { from: "Sarah M.", issue: "Download link not working", orderId: "ORD-4821" },
-    { from: "Tom K.", issue: "Can I get this in A4 size?", orderId: "ORD-4799" },
-  ],
-  salesData: { thisMonth: 2841, lastMonth: 2401, orders: 63, avgOrderValue: 6.80 },
+  storeInfo: { name: "", niche: "", rating: 0, totalSales: 0 },
+  listings: [],
+  messages: [],
+  salesData: { thisMonth: 0, lastMonth: 0, orders: 0, avgOrderValue: 0 },
 };
