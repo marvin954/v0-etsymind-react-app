@@ -57,10 +57,10 @@ interface Listing {
 }
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
-const API = "https://v0-etsymind-react-app-git-main-marvin-stokes-projects.vercel.app";
+
 
 async function runAgent(agent: string, params?: any) {
-  const res = await fetch(`${API}/api/run`, {
+  const res = await fetch(`/api/run`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ agent, params }),
@@ -206,7 +206,7 @@ export default function EtsyMindDashboard() {
   async function loadListings() {
     setLoadingListings(true);
     try {
-      const res = await fetch(`${API}/api/etsy/listings`);
+      const res = await fetch(`/api/etsy/listings`);
       const data = await res.json();
       setListings(data.listings || []);
     } catch {}
