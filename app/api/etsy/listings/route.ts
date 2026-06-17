@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const ETSY_BASE = "https://openapi.etsy.com/v3";
+const ETSY_BASE = "https://api.etsy.com/v3";
 
 async function etsyRequest(path: string, method = "GET", body?: object) {
   const token = process.env.ETSY_ACCESS_TOKEN;
