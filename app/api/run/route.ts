@@ -159,9 +159,7 @@ async function autonomousPublish(product: any): Promise<{
   image_generated: boolean;
   status: string;
 }> {
-  function getValidToken(): string {
-  return process.env.ETSY_ACCESS_TOKEN!;
-}
+  const token = getValidToken();
   const shopId = process.env.ETSY_SHOP_ID!;
   const priceNum = parseFloat((product.price || "4.99").toString().replace("$", "")) || 4.99;
 
