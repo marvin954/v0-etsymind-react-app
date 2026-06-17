@@ -1,6 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 
-async function callClaude(system: string, user: string, maxTokens = 2000): Promise<any> {
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+async function getValidToken(): Promise<string> {
+  // Try current token first
+  const current = process.env.ETSY_ACCESS_TOKEN!;
+
+  // Test it
+  const test = await fetch(
+    `https://api.etsy.com/v3/application/shops/${process.env.ETSY_SHOP_ID}`,
+    { headers: { "x-api-key": process.env.ETSY_API_KEY!, "Authorization": `Bearer ${current}` } }
+  );
+
+  if (test.ok) return current;
+
+  // Refresh it
+  const res = await fetch("https://api.etsy.com/v3/public/oauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      grant_type: "refresh_token",
+      client_id: process.env.ETSY_KEYSTRING!,
+      refresh_token: process.env.ETSY_REFRESH_TOKEN!,
+    }),
+  });
+  const data = await res.json();
+  if (!data.access_token) throw new Error("Token refresh failed: " + JSON.stringify(data));
+
+  // Note: in production, update env vars via Vercel API
+  // For now return the new token for this request
+  return data.access_token;
+}
+
+function etsyHeaders(token: string) {
+  return {
+    "Content-Type": "application/json",
+    "x-api-key": process.env.ETSY_API_KEY!,
+    "Authorization": `Bearer ${token}`,
+  };
+}
+
+async function claude(system: string, user: string, maxTokens = 2000): Promise<any> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -23,47 +63,241 @@ async function callClaude(system: string, user: string, maxTokens = 2000): Promi
   return JSON.parse(match[0]);
 }
 
-function getEtsyHeaders() {
+async function generateMockupImage(title: string, designBrief: string): Promise<Buffer> {
+  // Generate image with DALL-E 3
+  const prompt = `Professional Etsy digital product mockup for: "${title}". ${designBrief}. Clean white background, flat lay style, modern minimal design, showing a printed document or digital template preview. Professional product photography style. No text overlays.`;
+
+  const res = await fetch("https://api.openai.com/v1/images/generations", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "dall-e-3",
+      prompt,
+      n: 1,
+      size: "1024x1024",
+      response_format: "url",
+    }),
+  });
+
+  const data = await res.json();
+  if (data.error) throw new Error("DALL-E error: " + data.error.message);
+
+  const imageUrl = data.data[0].url;
+
+  // Download the image
+  const imgRes = await fetch(imageUrl);
+  const arrayBuffer = await imgRes.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+async function uploadImageToEtsy(
+  listingId: string,
+  imageBuffer: Buffer,
+  token: string
+): Promise<void> {
+  const shopId = process.env.ETSY_SHOP_ID!;
+
+  // Convert buffer to base64 for multipart upload
+  const base64 = imageBuffer.toString("base64");
+
+  // Etsy requires multipart/form-data for image upload
+  const boundary = "----EtsyImageBoundary" + Date.now();
+  const body = [
+    `--${boundary}`,
+    `Content-Disposition: form-data; name="image"; filename="mockup.jpg"`,
+    `Content-Type: image/jpeg`,
+    `Content-Transfer-Encoding: base64`,
+    "",
+    base64,
+    `--${boundary}--`,
+  ].join("\r\n");
+
+  const res = await fetch(
+    `https://api.etsy.com/v3/application/shops/${shopId}/listings/${listingId}/images`,
+    {
+      method: "POST",
+      headers: {
+        "x-api-key": process.env.ETSY_API_KEY!,
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+      },
+      body,
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Image upload failed: ${err}`);
+  }
+}
+
+async function activateListing(listingId: string, token: string): Promise<void> {
+  const shopId = process.env.ETSY_SHOP_ID!;
+  const res = await fetch(
+    `https://api.etsy.com/v3/application/shops/${shopId}/listings/${listingId}`,
+    {
+      method: "PATCH",
+      headers: etsyHeaders(token),
+      body: JSON.stringify({ state: "active" }),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Activation failed: ${err}`);
+  }
+}
+
+// ─── FULL AUTONOMOUS PUBLISH ───────────────────────────────────────────────────
+async function autonomousPublish(product: any): Promise<{
+  listing_id: string;
+  url: string;
+  title: string;
+  image_generated: boolean;
+  status: string;
+}> {
+  const token = await getValidToken();
+  const shopId = process.env.ETSY_SHOP_ID!;
+  const priceNum = parseFloat((product.price || "4.99").toString().replace("$", "")) || 4.99;
+
+  // Step 1: Create draft listing
+  const createRes = await fetch(
+    `https://api.etsy.com/v3/application/shops/${shopId}/listings`,
+    {
+      method: "POST",
+      headers: etsyHeaders(token),
+      body: JSON.stringify({
+        quantity: 999,
+        title: product.title.slice(0, 140),
+        description: product.description,
+        price: priceNum,
+        who_made: "i_did",
+        when_made: "made_to_order",
+        taxonomy_id: 2078,
+        tags: (product.tags || []).slice(0, 13),
+        is_digital: true,
+        should_auto_renew: true,
+        is_taxable: false,
+        type: "download",
+      }),
+    }
+  );
+
+  const listing = await createRes.json();
+  if (!createRes.ok || listing.error) throw new Error("Create listing failed: " + JSON.stringify(listing));
+
+  const listingId = listing.listing_id;
+  let imageGenerated = false;
+
+  // Step 2: Generate and upload mockup image
+  try {
+    const imageBuffer = await generateMockupImage(
+      product.title,
+      product.design_brief || "Professional digital product mockup"
+    );
+    await uploadImageToEtsy(listingId, imageBuffer, token);
+    imageGenerated = true;
+  } catch (e: any) {
+    console.error("Image generation/upload failed:", e.message);
+    // Continue without image — listing stays as draft
+  }
+
+  // Step 3: Activate listing (only if image was uploaded)
+  let status = "draft";
+  if (imageGenerated) {
+    try {
+      await activateListing(listingId, token);
+      status = "active";
+    } catch (e: any) {
+      console.error("Activation failed:", e.message);
+      status = "draft_with_image";
+    }
+  }
+
   return {
-    "Content-Type": "application/json",
-    "x-api-key": process.env.ETSY_API_KEY!,
-    "Authorization": `Bearer ${process.env.ETSY_ACCESS_TOKEN!}`,
+    listing_id: listingId,
+    url: `https://www.etsy.com/listing/${listingId}`,
+    title: product.title,
+    image_generated: imageGenerated,
+    status,
   };
 }
 
+// ─── FULL PIPELINE: Research → Create → Publish ───────────────────────────────
+async function runFullPipeline(niche?: string): Promise<any> {
+  const log: string[] = [];
+
+  // Step 1: Research (or use provided niche)
+  const targetNiche = niche || "Small Business Owner Tools";
+  log.push(`Target niche: ${targetNiche}`);
+
+  // Step 2: Create products
+  log.push("Creating products...");
+  const products = await claude(
+    `You are a product creation agent for an Etsy shop specializing in digital downloads. Create listings optimized for Etsy SEO. Keep descriptions under 400 characters. Respond ONLY with a valid JSON array.`,
+    `Create 3 complete Etsy digital product listings for the "${targetNiche}" niche. Return JSON array: [{"title":"SEO title max 140 chars","description":"under 400 chars","tags":["tag1","tag2","tag3","tag4","tag5","tag6","tag7","tag8","tag9","tag10","tag11","tag12","tag13"],"price":"$X.XX","design_brief":"brief description of what the mockup image should look like, max 50 words"}]`,
+    2000
+  );
+
+  log.push(`Created ${products.length} products`);
+
+  // Step 3: Publish each product autonomously
+  const published = [];
+  for (const product of products) {
+    log.push(`Publishing: ${product.title.slice(0, 50)}...`);
+    try {
+      const result = await autonomousPublish(product);
+      published.push(result);
+      log.push(`✓ ${result.status}: ${result.url}`);
+    } catch (e: any) {
+      log.push(`✗ Failed: ${e.message}`);
+    }
+  }
+
+  return { log, published, total: published.length };
+}
+
+// ─── ROUTE HANDLER ────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const { agent, params } = await req.json();
 
   try {
     switch (agent) {
 
+      case "full_pipeline":
+        return NextResponse.json({ result: await runFullPipeline(params?.niche) });
+
+      case "publish_one":
+        return NextResponse.json({ result: await autonomousPublish(params) });
+
       case "analytics": {
+        const token = await getValidToken();
         const res = await fetch(
           `https://api.etsy.com/v3/application/shops/${process.env.ETSY_SHOP_ID}/listings?state=active&limit=100`,
-          { headers: getEtsyHeaders() }
+          { headers: etsyHeaders(token) }
         );
         const data = await res.json();
         const listings = data.results || [];
         const totalViews = listings.reduce((s: number, l: any) => s + (l.views || 0), 0);
         const totalFavorites = listings.reduce((s: number, l: any) => s + (l.num_favorers || 0), 0);
-
-        const report = await fetch("https://api.anthropic.com/v1/messages", {
+        const reportRes = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY!, "anthropic-version": "2023-06-01" },
           body: JSON.stringify({
-            model: "claude-sonnet-4-6", max_tokens: 1500,
-            system: "You are an analytics agent for an Etsy store. Provide a concise performance report with health score, wins, problems, and actions.",
-            messages: [{ role: "user", content: `Store: ${listings.length} listings, ${totalViews} views, ${totalFavorites} favorites. Top listings: ${JSON.stringify(listings.slice(0, 3).map((l: any) => ({ title: l.title, views: l.views })))}. Give health score 0-100, top 3 wins, top 3 problems, top 5 actions.` }],
+            model: "claude-sonnet-4-6", max_tokens: 1000,
+            system: "You are an analytics agent for an Etsy store. Give a concise report with health score, wins, problems, actions.",
+            messages: [{ role: "user", content: `${listings.length} listings, ${totalViews} views, ${totalFavorites} favorites. Top: ${JSON.stringify(listings.slice(0, 3).map((l: any) => ({ title: l.title?.slice(0, 40), views: l.views })))}. Health score 0-100, top 3 problems, top 5 actions.` }],
           }),
         }).then(r => r.json()).then(d => d.content[0].text);
-
-        return NextResponse.json({ result: { timestamp: new Date().toISOString(), listings_count: listings.length, total_views: totalViews, total_favorites: totalFavorites, report } });
+        return NextResponse.json({ result: { timestamp: new Date().toISOString(), listings_count: listings.length, total_views: totalViews, total_favorites: totalFavorites, report: reportRes } });
       }
 
       case "market_research": {
-        const result = await callClaude(
-          "You are a market research agent for an Etsy store selling digital products and POD. Identify trending niches with high demand and low competition. Respond ONLY with valid JSON, no markdown.",
-          `Identify 5 trending Etsy niches right now. Return JSON: {"trending":[{"niche":"","demand":"high|medium","competition":"low|medium|high","products":["",""],"avg_price":"","keywords":["",""]}],"recommendations":["action1","action2"]}`,
+        const result = await claude(
+          "You are a market research agent for Etsy. Find high-demand, low-competition niches for digital products. Respond ONLY with valid JSON.",
+          `Find 5 trending Etsy niches for digital products right now. Return JSON: {"trending":[{"niche":"","demand":"high|medium","competition":"low|medium|high","products":[""],"avg_price":"","keywords":[""]}],"recommendations":[""]}`,
           1500
         );
         return NextResponse.json({ result });
@@ -71,23 +305,23 @@ export async function POST(req: NextRequest) {
 
       case "product_creator": {
         const niche = params?.niche || "Small Business Tools";
-        const type = params?.type || "digital";
-        const result = await callClaude(
-          `You are a product creation agent for an Etsy shop. Create complete listings optimized for Etsy SEO. Keep descriptions under 500 characters. Respond ONLY with valid JSON array, no markdown.`,
-          `Create 3 Etsy listings for "${niche}" niche, type: ${type}. Return JSON array: [{"title":"SEO title max 140 chars","description":"product description max 400 chars","tags":["tag1","tag2","tag3","tag4","tag5","tag6","tag7","tag8","tag9","tag10","tag11","tag12","tag13"],"price":"$X.XX","category":"Digital Downloads","design_brief":"what the product contains"}]`,
+        const result = await claude(
+          "You are a product creation agent for Etsy. Create SEO-optimized listings. Keep descriptions under 400 chars. Respond ONLY with valid JSON array.",
+          `Create 3 Etsy digital product listings for "${niche}". Return JSON array: [{"title":"max 140 chars","description":"max 400 chars","tags":["tag1",...13 tags],"price":"$X.XX","design_brief":"mockup image description max 50 words"}]`,
           2000
         );
         return NextResponse.json({ result });
       }
 
       case "publish": {
+        const token = await getValidToken();
         const product = params;
-        const priceNum = parseFloat((product.price || "4.99").replace("$", "")) || 4.99;
+        const priceNum = parseFloat((product.price || "4.99").toString().replace("$", "")) || 4.99;
         const res = await fetch(
           `https://api.etsy.com/v3/application/shops/${process.env.ETSY_SHOP_ID}/listings`,
           {
             method: "POST",
-            headers: getEtsyHeaders(),
+            headers: etsyHeaders(token),
             body: JSON.stringify({
               quantity: 999,
               title: product.title.slice(0, 140),
@@ -105,24 +339,8 @@ export async function POST(req: NextRequest) {
           }
         );
         const listing = await res.json();
-        if (listing.error) throw new Error(listing.error);
+        if (!res.ok) throw new Error(JSON.stringify(listing));
         return NextResponse.json({ result: { listing_id: listing.listing_id, url: `https://www.etsy.com/listing/${listing.listing_id}`, title: product.title } });
-      }
-
-      case "listing_manager": {
-        const res = await fetch(
-          `https://api.etsy.com/v3/application/shops/${process.env.ETSY_SHOP_ID}/listings?state=active&limit=100`,
-          { headers: getEtsyHeaders() }
-        );
-        const data = await res.json();
-        const listings = (data.results || []).map((l: any) => ({ id: l.listing_id, title: l.title, views: l.views || 0, favorites: l.num_favorers || 0 }));
-        if (!listings.length) return NextResponse.json({ result: [] });
-        const result = await callClaude(
-          "You are a listing management agent. Analyze Etsy listings and recommend actions. Respond ONLY with valid JSON array.",
-          `Analyze: ${JSON.stringify(listings)}. Return JSON array: [{"listing_id":"","action":"refresh|optimize|boost","reason":"","priority":"high|medium|low"}]`,
-          1000
-        );
-        return NextResponse.json({ result });
       }
 
       default:
