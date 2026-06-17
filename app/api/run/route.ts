@@ -3,8 +3,27 @@ export const maxDuration = 60;
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
-function getValidToken(): string {
-  return process.env.ETSY_ACCESS_TOKEN!;
+async function getValidToken(): Promise<string> {
+  const current = process.env.ETSY_ACCESS_TOKEN!;
+  // Try current token
+  const test = await fetch(
+    `https://api.etsy.com/v3/application/shops/${process.env.ETSY_SHOP_ID}`,
+    { headers: { "x-api-key": process.env.ETSY_API_KEY!, "Authorization": `Bearer ${current}` } }
+  );
+  if (test.ok) return current;
+  // Token expired — refresh it
+  const res = await fetch("https://api.etsy.com/v3/public/oauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      grant_type: "refresh_token",
+      client_id: process.env.ETSY_KEYSTRING!,
+      refresh_token: process.env.ETSY_REFRESH_TOKEN!,
+    }),
+  });
+  const data = await res.json();
+  if (!data.access_token) throw new Error("Token refresh failed: " + JSON.stringify(data));
+  return data.access_token;
 }
 
 function etsyHeaders(token: string) {
@@ -102,7 +121,7 @@ async function autonomousPublish(product: any): Promise<{
   image_generated: boolean;
   status: string;
 }> {
-  const token = getValidToken();
+  const token = await getValidToken();
   const shopId = process.env.ETSY_SHOP_ID!;
   const priceNum = parseFloat((product.price || "4.99").toString().replace("$", "")) || 4.99;
 
@@ -119,7 +138,7 @@ async function autonomousPublish(product: any): Promise<{
         who_made: "i_did",
         when_made: "made_to_order",
         taxonomy_id: 2078,
-        tags: (product.tags || []).slice(0, 13),
+        tags: (product.tags || []).slice(0, 13).map((t: string) => t.slice(0, 20)),
         is_digital: true,
         should_auto_renew: true,
         is_taxable: false,
@@ -173,7 +192,7 @@ async function runFullPipeline(niche?: string): Promise<any> {
   log.push("Creating products...");
   const products = await claude(
     `You are a product creation agent for an Etsy shop specializing in digital downloads. Create listings optimized for Etsy SEO. Keep descriptions under 400 characters. Respond ONLY with a valid JSON array.`,
-    `Create 3 complete Etsy digital product listings for the "${targetNiche}" niche. Return JSON array: [{"title":"SEO title max 140 chars","description":"under 400 chars","tags":["tag1","tag2","tag3","tag4","tag5","tag6","tag7","tag8","tag9","tag10","tag11","tag12","tag13"],"price":"$X.XX","design_brief":"brief description of what the mockup image should look like, max 50 words"}]`,
+    `Create 3 complete Etsy digital product listings for the "${targetNiche}" niche. Return JSON array: [{"title":"SEO title max 140 chars","description":"under 400 chars","tags":["tag1","tag2","tag3","tag4","tag5","tag6","tag7","tag8","tag9","tag10","tag11","tag12","tag13"],"price":"$X.XX","design_brief":"max 50 words"}]. CRITICAL: every single tag must be 20 characters or less. Count the characters. No exceptions.`,
     2000
   );
   log.push(`Created ${products.length} products`);
@@ -208,7 +227,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ result: await autonomousPublish(params) });
 
       case "analytics": {
-        const token = getValidToken();
+        const token = await getValidToken();
         const res = await fetch(
           `https://api.etsy.com/v3/application/shops/${process.env.ETSY_SHOP_ID}/listings?state=active&limit=100`,
           { headers: etsyHeaders(token) }
@@ -249,7 +268,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "listing_manager": {
-        const token = getValidToken();
+        const token = await getValidToken();
         const res = await fetch(
           `https://api.etsy.com/v3/application/shops/${process.env.ETSY_SHOP_ID}/listings?state=active&limit=100`,
           { headers: etsyHeaders(token) }
@@ -266,7 +285,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "publish": {
-        const token = getValidToken();
+        const token = await getValidToken();
         const product = params;
         const priceNum = parseFloat((product.price || "4.99").toString().replace("$", "")) || 4.99;
         const res = await fetch(
@@ -282,7 +301,7 @@ export async function POST(req: NextRequest) {
               who_made: "i_did",
               when_made: "made_to_order",
               taxonomy_id: 2078,
-              tags: (product.tags || []).slice(0, 13),
+              tags: (product.tags || []).slice(0, 13).map((t: string) => t.slice(0, 20)),
               is_digital: true,
               should_auto_renew: true,
               is_taxable: false,
