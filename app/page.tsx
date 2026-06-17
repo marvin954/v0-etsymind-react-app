@@ -1,5 +1,5 @@
-import EtsyMindAI from "@/components/etsy-mind-ai";
+import EtsyMindDashboard from "@/components/etsy-mind-dashboard";
 
 export default function Page() {
-  return <EtsyMindAI />;
+  return <EtsyMindDashboard />;
 }
