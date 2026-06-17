@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+export const maxDuration = 60;
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -245,7 +246,9 @@ async function runFullPipeline(niche?: string): Promise<any> {
 
   // Step 3: Publish each product autonomously
   const published = [];
-  for (const product of products) {
+  // Only publish 1 product per run to stay within timeout
+const toPublish = products.slice(0, 1);
+for (const product of toPublish) { {
     log.push(`Publishing: ${product.title.slice(0, 50)}...`);
     try {
       const result = await autonomousPublish(product);
