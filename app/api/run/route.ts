@@ -272,7 +272,7 @@ async function runFullPipeline(niche?: string): Promise<any> {
   log.push(`Created ${products.length} products`);
 
   const published = [];
-  for (const product of products.slice(0, 2)) {
+  for (const product of products.slice(0, 1)) {
     log.push(`Publishing: ${product.title.slice(0, 50)}...`);
     try {
       const result = await autonomousPublish(product);
