@@ -66,8 +66,6 @@ async function generateMockupImage(title: string, designBrief: string): Promise<
   if (!res.ok) throw new Error(`Pollinations failed: ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
 }
-}
-
 async function uploadImageToEtsy(listingId: string, imageBuffer: Buffer, token: string): Promise<void> {
   const shopId = process.env.ETSY_SHOP_ID!;
   const boundary = "----EtsyImageBoundary" + Date.now();
