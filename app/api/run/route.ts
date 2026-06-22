@@ -2,24 +2,56 @@ import { NextRequest, NextResponse } from "next/server";
 export const maxDuration = 60;
 
 async function getValidToken(): Promise<string> {
-  const current = process.env.ETSY_ACCESS_TOKEN!;
+  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+  // Read token from Supabase
+  const readRes = await fetch(`${SUPABASE_URL}/rest/v1/etsy_tokens?id=eq.default&select=access_token,refresh_token`, {
+    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` },
+  });
+  const rows = await readRes.json();
+  const row = rows[0];
+  if (!row) throw new Error("No token found in Supabase etsy_tokens table");
+
+  const current = row.access_token;
+
+  // Test current token
   const test = await fetch(
     `https://api.etsy.com/v3/application/shops/${process.env.ETSY_SHOP_ID}`,
     { headers: { "x-api-key": process.env.ETSY_API_KEY!, "Authorization": `Bearer ${current}` } }
   );
   if (test.ok) return current;
-  const res = await fetch("https://api.etsy.com/v3/public/oauth/token", {
+
+  // Token expired — refresh it
+  const refreshRes = await fetch("https://api.etsy.com/v3/public/oauth/token", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       grant_type: "refresh_token",
       client_id: process.env.ETSY_KEYSTRING!,
-      refresh_token: process.env.ETSY_REFRESH_TOKEN!,
+      refresh_token: row.refresh_token,
     }),
   });
-  const data = await res.json();
-  if (!data.access_token) throw new Error("Token refresh failed: " + JSON.stringify(data));
-  return data.access_token;
+  const tokens = await refreshRes.json();
+  if (!tokens.access_token) throw new Error("Token refresh failed: " + JSON.stringify(tokens));
+
+  // Save new tokens back to Supabase
+  await fetch(`${SUPABASE_URL}/rest/v1/etsy_tokens?id=eq.default`, {
+    method: "PATCH",
+    headers: {
+      "apikey": SUPABASE_KEY,
+      "Authorization": `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=minimal",
+    },
+    body: JSON.stringify({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      updated_at: new Date().toISOString(),
+    }),
+  });
+
+  return tokens.access_token;
 }
 
 function etsyHeaders(token: string) {
