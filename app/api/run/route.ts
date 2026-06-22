@@ -58,25 +58,14 @@ async function claude(system: string, user: string, maxTokens = 2000): Promise<a
 }
 
 async function generateMockupImage(title: string, designBrief: string): Promise<Buffer> {
-  const prompt = `Professional Etsy digital product mockup for: "${title}". ${designBrief}. Clean white background, flat lay style, modern minimal design, showing a printed document or digital template preview. Professional product photography style. No text overlays.`;
-  const res = await fetch("https://api.openai.com/v1/images/generations", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "dall-e-2",
-      prompt,
-      n: 1,
-      size: "1024x1024",
-    }),
-  });
-  const data = await res.json();
-  if (data.error) throw new Error("DALL-E error: " + data.error.message);
-  const imgRes = await fetch(data.data[0].url);
-  const arrayBuffer = await imgRes.arrayBuffer();
-  return Buffer.from(arrayBuffer);
+  const prompt = encodeURIComponent(
+    `professional etsy digital product mockup, ${designBrief}, clean white background, flat lay, minimal design, no text, product photography`
+  );
+  const url = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=1024&nologo=true`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Pollinations failed: ${res.status}`);
+  return Buffer.from(await res.arrayBuffer());
+}
 }
 
 async function uploadImageToEtsy(listingId: string, imageBuffer: Buffer, token: string): Promise<void> {
