@@ -70,7 +70,6 @@ async function generateMockupImage(title: string, designBrief: string): Promise<
       prompt,
       n: 1,
       size: "1024x1024",
-      response_format: "url",
     }),
   });
   const data = await res.json();
