@@ -200,12 +200,8 @@ async function autonomousPublish(product: any): Promise<any> {
     imageGenerated = true;
   } catch (e: any) { console.error("Image failed:", e.message); }
 
-  try {
-    const pdfBuf = await generateProductPDF(product.title, product.design_brief || product.title);
-    const fname = product.title.slice(0, 40).replace(/[^a-z0-9]/gi, "_").toLowerCase() + ".pdf";
-    await uploadFileToEtsy(listingId, pdfBuf, fname, token);
-    fileUploaded = true;
-  } catch (e: any) { console.error("PDF failed:", e.message); }
+  // PDF generation skipped in pipeline (timeout) — use fix_images agent separately
+  const fileUploaded = false;
 
   let status = "draft";
   if (imageGenerated) {
@@ -273,7 +269,7 @@ async function runFullPipeline(niche?: string): Promise<any> {
   log.push(`Created ${products.length} products`);
 
   const published = [];
-  for (const product of products.slice(0, 2)) {
+  for (const product of products.slice(0, 1)) {
     log.push(`Publishing: ${product.title.slice(0, 50)}...`);
     try {
       const result = await autonomousPublish(product);
