@@ -147,42 +147,27 @@ async function generateMockupImage(title: string, designBrief: string): Promise<
 
 // ─── AI ASSET SPRINT — Generate real HTML digital product ─────────────────────
 async function generateAssetHTML(title: string, niche: string): Promise<string> {
-  // Step 1: Pain points
-  const painRes = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY!, "anthropic-version": "2023-06-01" },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6", max_tokens: 800,
-      system: "You are a market research expert. Return only a JSON array of strings.",
-      messages: [{ role: "user", content: `List 8 specific pain points for someone who needs: "${title}". Return JSON array: ["pain1","pain2",...]` }],
-    }),
-  }).then(r => r.json()).then(d => {
-    const t = d.content[0].text;
-    const m = t.match(/\[[\s\S]*\]/);
-    return m ? JSON.parse(m[0]) : ["struggling with organization","lack of systems","wasting time","missing opportunities","feeling overwhelmed","no clear process","inconsistent results","burning out"];
-  });
+      model: "claude-sonnet-4-6", max_tokens: 4000,
+      system: `You are a professional digital product creator. Create a complete, valuable digital guide as a single JSON object. Return ONLY valid JSON, no markdown.`,
+      messages: [{ role: "user", content: `Create a complete digital guide for: "${title}" in the ${niche} niche.
 
-  // Step 2: Full product content using Hormozi framework
-  const contentRes = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY!, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6", max_tokens: 3000,
-      system: `You are a professional digital product creator and ghostwriter. Create complete, valuable, actionable content.
-Return ONLY a JSON object with these exact keys:
+Return this exact JSON structure:
 {
-  "tagline": "one powerful transformation promise sentence",
-  "intro": "2 paragraph introduction addressing their pain",
+  "tagline": "one powerful transformation promise",
+  "intro": "2 paragraph introduction",
   "sections": [
-    { "title": "section title", "content": "300+ word detailed actionable content with specific steps, examples, and tips" }
+    {"title": "section title", "content": "200+ word actionable content"},
+    {"title": "section title", "content": "200+ word actionable content"},
+    {"title": "section title", "content": "200+ word actionable content"},
+    {"title": "section title", "content": "200+ word actionable content"}
   ],
-  "action_plan": "7 specific action steps numbered list",
-  "bonus": "a valuable bonus tip or resource"
-}
-Create 5 sections. Make it genuinely useful and worth paying for.`,
-      messages: [{ role: "user", content: `Create a complete digital guide for: "${title}"
-Niche: ${niche}
-Pain points to address: ${painRes.slice(0,5).join(", ")}` }],
+  "action_steps": ["step 1", "step 2", "step 3", "step 4", "step 5"],
+  "bonus": "a valuable bonus tip"
+}` }],
     }),
   }).then(r => r.json()).then(d => {
     const t = d.content[0].text;
@@ -190,14 +175,13 @@ Pain points to address: ${painRes.slice(0,5).join(", ")}` }],
     return m ? JSON.parse(m[0]) : null;
   });
 
-  if (!contentRes) throw new Error("Failed to generate product content");
+  if (!res) throw new Error("Failed to generate content");
 
-  // Step 3: Build styled HTML product
-  const sectionsHTML = (contentRes.sections || []).map((s: any, i: number) => `
+  const sectionsHTML = (res.sections || []).map((s: any, i: number) => `
     <section class="chapter">
       <div class="chapter-num">0${i+1}</div>
       <h2>${s.title}</h2>
-      <div class="chapter-content">${s.content.split("\n").map((p: string) => p.trim() ? `<p>${p}</p>` : "").join("")}</div>
+      <div class="chapter-content">${s.content.split("\n").filter((p: string) => p.trim()).map((p: string) => `<p>${p}</p>`).join("")}</div>
     </section>`).join("");
 
   return `<!DOCTYPE html>
@@ -207,87 +191,63 @@ Pain points to address: ${painRes.slice(0,5).join(", ")}` }],
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${title}</title>
 <style>
-  :root { --gold:#f5a623; --dark:#0d0d15; --surface:#141420; --text:#e8e8f0; --dim:#64748b; --border:#1e1e2e; }
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:var(--dark); color:var(--text); font-family:Georgia,serif; line-height:1.8; }
-  
-  .cover { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:60px 40px; background:linear-gradient(135deg,#0d0d15 0%,#1a0a2e 50%,#0d0d15 100%); border-bottom:3px solid var(--gold); }
-  .cover-badge { font-family:'Courier New',monospace; font-size:11px; letter-spacing:0.3em; color:var(--gold); background:rgba(245,166,35,0.1); border:1px solid rgba(245,166,35,0.3); padding:6px 20px; margin-bottom:32px; }
-  .cover h1 { font-size:clamp(28px,5vw,52px); font-weight:400; color:#fff; letter-spacing:-0.02em; line-height:1.2; margin-bottom:20px; max-width:800px; }
-  .cover h1 span { color:var(--gold); }
-  .cover-tagline { font-size:18px; color:var(--dim); max-width:600px; margin-bottom:40px; font-style:italic; }
-  .cover-divider { width:60px; height:2px; background:var(--gold); margin:0 auto 40px; }
-  .cover-meta { font-family:'Courier New',monospace; font-size:10px; color:var(--dim); letter-spacing:0.2em; }
-
-  .toc { max-width:720px; margin:60px auto; padding:0 40px; }
-  .toc h3 { font-size:11px; font-family:'Courier New',monospace; letter-spacing:0.2em; color:var(--gold); margin-bottom:20px; }
-  .toc-item { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); font-size:14px; color:var(--dim); }
-  .toc-item span:first-child { color:var(--text); }
-  .toc-num { font-family:'Courier New',monospace; font-size:11px; color:var(--gold); }
-
-  .chapter { max-width:720px; margin:0 auto; padding:60px 40px; border-bottom:1px solid var(--border); }
-  .chapter-num { font-family:'Courier New',monospace; font-size:10px; color:var(--gold); letter-spacing:0.3em; margin-bottom:12px; }
-  .chapter h2 { font-size:28px; font-weight:400; color:#fff; margin-bottom:24px; line-height:1.3; }
-  .chapter-content p { color:var(--dim); margin-bottom:16px; font-size:16px; }
-  .chapter-content p:first-child { font-size:18px; color:var(--text); }
-
-  .action-plan { max-width:720px; margin:0 auto; padding:60px 40px; background:var(--surface); border-top:3px solid var(--gold); border-bottom:3px solid var(--gold); }
-  .action-plan h2 { font-size:24px; color:var(--gold); margin-bottom:24px; }
-  .action-steps { counter-reset:steps; list-style:none; }
-  .action-steps li { counter-increment:steps; display:flex; gap:16px; margin-bottom:16px; padding:14px 18px; background:rgba(245,166,35,0.05); border-left:2px solid var(--gold); font-size:15px; color:var(--text); }
-  .action-steps li::before { content:counter(steps); font-family:'Courier New',monospace; font-size:11px; color:var(--gold); font-weight:800; flex-shrink:0; margin-top:2px; }
-
-  .bonus { max-width:720px; margin:60px auto; padding:40px; background:linear-gradient(135deg,rgba(245,166,35,0.08),rgba(245,166,35,0.03)); border:1px solid rgba(245,166,35,0.2); }
-  .bonus-badge { font-family:'Courier New',monospace; font-size:10px; color:var(--gold); letter-spacing:0.2em; margin-bottom:12px; }
-  .bonus p { font-size:15px; color:var(--dim); line-height:1.7; }
-
-  .footer { text-align:center; padding:40px; font-family:'Courier New',monospace; font-size:10px; color:var(--border); letter-spacing:0.2em; }
-  
-  @media print { body { background:#fff; color:#111; } .cover { background:#fff; } .cover h1, .cover h1 span, .action-plan h2 { color:#111; } .chapter-content p { color:#333; } }
+:root{--gold:#f5a623;--dark:#0d0d15;--surface:#141420;--text:#e8e8f0;--dim:#64748b;--border:#1e1e2e}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--dark);color:var(--text);font-family:Georgia,serif;line-height:1.8}
+.cover{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 40px;background:linear-gradient(135deg,#0d0d15,#1a0a2e,#0d0d15);border-bottom:3px solid var(--gold)}
+.cover-badge{font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.3em;color:var(--gold);background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.3);padding:6px 20px;margin-bottom:32px}
+.cover h1{font-size:clamp(26px,5vw,48px);font-weight:400;color:#fff;line-height:1.2;margin-bottom:20px;max-width:800px}
+.cover h1 em{color:var(--gold);font-style:normal}
+.cover-tagline{font-size:17px;color:var(--dim);max-width:600px;margin-bottom:40px;font-style:italic}
+.cover-divider{width:60px;height:2px;background:var(--gold);margin:0 auto 40px}
+.cover-meta{font-family:'Courier New',monospace;font-size:10px;color:var(--dim);letter-spacing:0.2em}
+.chapter{max-width:720px;margin:0 auto;padding:60px 40px;border-bottom:1px solid var(--border)}
+.chapter-num{font-family:'Courier New',monospace;font-size:10px;color:var(--gold);letter-spacing:0.3em;margin-bottom:12px}
+.chapter h2{font-size:26px;font-weight:400;color:#fff;margin-bottom:24px;line-height:1.3}
+.chapter-content p{color:var(--dim);margin-bottom:16px;font-size:16px}
+.chapter-content p:first-child{font-size:18px;color:var(--text)}
+.intro{max-width:720px;margin:0 auto;padding:60px 40px;border-bottom:1px solid var(--border)}
+.intro h2{font-size:26px;color:#fff;margin-bottom:20px}
+.intro p{color:var(--dim);font-size:16px;margin-bottom:16px}
+.action-plan{max-width:720px;margin:0 auto;padding:60px 40px;background:var(--surface);border-top:3px solid var(--gold);border-bottom:3px solid var(--gold)}
+.action-plan h2{font-size:22px;color:var(--gold);margin-bottom:24px}
+.steps{list-style:none;counter-reset:steps}
+.steps li{counter-increment:steps;display:flex;gap:16px;margin-bottom:14px;padding:12px 16px;background:rgba(245,166,35,0.05);border-left:2px solid var(--gold);font-size:15px;color:var(--text)}
+.steps li::before{content:counter(steps);font-family:'Courier New',monospace;font-size:11px;color:var(--gold);font-weight:800;flex-shrink:0;margin-top:2px}
+.bonus{max-width:720px;margin:60px auto;padding:40px;background:linear-gradient(135deg,rgba(245,166,35,0.08),rgba(245,166,35,0.03));border:1px solid rgba(245,166,35,0.2)}
+.bonus-badge{font-family:'Courier New',monospace;font-size:10px;color:var(--gold);letter-spacing:0.2em;margin-bottom:12px}
+.bonus p{font-size:15px;color:var(--dim);line-height:1.7}
+.footer{text-align:center;padding:40px;font-family:'Courier New',monospace;font-size:10px;color:var(--border);letter-spacing:0.2em}
 </style>
 </head>
 <body>
-
 <div class="cover">
   <div class="cover-badge">DIGITAL GUIDE · INSTANT DOWNLOAD</div>
-  <h1>${title.split(" ").map((w: string, i: number) => i < 3 ? `<span>${w}</span>` : w).join(" ")}</h1>
-  <div class="cover-tagline">${contentRes.tagline}</div>
+  <h1>${title}</h1>
+  <div class="cover-tagline">${res.tagline}</div>
   <div class="cover-divider"></div>
-  <div class="cover-meta">mvpdealz · ${new Date().getFullYear()}</div>
+  <div class="cover-meta">MVPDEALZ · ${new Date().getFullYear()}</div>
 </div>
-
-<div class="toc">
-  <h3>TABLE OF CONTENTS</h3>
-  <div class="toc-item"><span>Introduction</span><span class="toc-num">01</span></div>
-  ${(contentRes.sections || []).map((s: any, i: number) => `<div class="toc-item"><span>${s.title}</span><span class="toc-num">0${i+2}</span></div>`).join("")}
-  <div class="toc-item"><span>Your Action Plan</span><span class="toc-num">0${(contentRes.sections||[]).length+2}</span></div>
+<div class="intro">
+  <h2>Introduction</h2>
+  ${res.intro.split("\n").filter((p: string) => p.trim()).map((p: string) => `<p>${p}</p>`).join("")}
 </div>
-
-<section class="chapter">
-  <div class="chapter-num">INTRODUCTION</div>
-  <h2>Why This Guide Exists</h2>
-  <div class="chapter-content">${contentRes.intro.split("\n").map((p: string) => p.trim() ? `<p>${p}</p>` : "").join("")}</div>
-</section>
-
 ${sectionsHTML}
-
 <div class="action-plan">
-  <h2>⚡ Your 7-Step Action Plan</h2>
-  <ol class="action-steps">
-    ${contentRes.action_plan.split("\n").filter((l: string) => l.trim()).slice(0,7).map((step: string) => `<li>${step.replace(/^\d+\.?\s*/, "")}</li>`).join("")}
+  <h2>⚡ Your Action Plan</h2>
+  <ol class="steps">
+    ${(res.action_steps || []).map((s: string) => `<li>${s}</li>`).join("")}
   </ol>
 </div>
-
 <div class="bonus">
-  <div class="bonus-badge">BONUS</div>
-  <p>${contentRes.bonus}</p>
+  <div class="bonus-badge">BONUS TIP</div>
+  <p>${res.bonus}</p>
 </div>
-
-<div class="footer">© ${new Date().getFullYear()} MVPDealz · All Rights Reserved · Instant Digital Download</div>
-
+<div class="footer">© ${new Date().getFullYear()} MVPDEALZ · ALL RIGHTS RESERVED</div>
 </body>
 </html>`;
 }
+
 
 // Upload HTML file to Etsy listing
 async function uploadHTMLToEtsy(listingId: string, htmlContent: string, filename: string, token: string): Promise<void> {
@@ -442,7 +402,7 @@ async function autonomousPublish(product: any): Promise<any> {
   const listingId = listing.listing_id;
 
   let imageGenerated = false;
-  
+  let fileUploaded = false;
 
   try {
     const imgBuf = await generateMockupImage(product.title, product.design_brief || product.title);
