@@ -409,9 +409,14 @@ async function autonomousPublish(product: any): Promise<any> {
     imageGenerated = true;
   } catch (e: any) { console.error("Image failed:", e.message); }
 
-// HTML product generated separately to avoid timeout
-  const fileUploaded = false;
- 
+  // Generate real HTML product using AI Asset Sprint pipeline
+  let fileUploaded = false;
+  try {
+    const htmlContent = await generateAssetHTML(product.title, product.category || "digital products");
+    const filename = product.title.slice(0, 40).replace(/[^a-z0-9]/gi, "_").toLowerCase() + ".html";
+    await uploadHTMLToEtsy(listingId, htmlContent, filename, token);
+    fileUploaded = true;
+  } catch (e: any) { console.error("HTML product failed:", e.message); }
 
   let status = "draft";
   if (imageGenerated) {
@@ -571,6 +576,29 @@ export async function POST(req: NextRequest) {
 
       case "queue_status":
         return NextResponse.json({ result: await getQueueStatus() });
+
+      case "generate_product": {
+        // Run Asset Sprint on an existing listing and upload the HTML file
+        const { listing_id, title } = params || {};
+        if (!listing_id || !title) return NextResponse.json({ error: "listing_id and title required" }, { status: 400 });
+        const token = await getValidToken();
+        const niche = params?.niche || "digital products";
+        const log: string[] = [];
+        log.push(`Generating product for listing #${listing_id}...`);
+        log.push(`Title: ${title.slice(0, 60)}`);
+        try {
+          const htmlContent = await generateAssetHTML(title, niche);
+          log.push("✓ HTML product generated");
+          const filename = title.slice(0, 40).replace(/[^a-z0-9]/gi, "_").toLowerCase() + ".html";
+          await uploadHTMLToEtsy(listing_id.toString(), htmlContent, filename, token);
+          log.push(`✓ File uploaded: ${filename}`);
+          log.push(`✓ Product is now downloadable on Etsy`);
+          return NextResponse.json({ result: { success: true, log, listing_id, filename, size: htmlContent.length } });
+        } catch (e: any) {
+          log.push(`✗ Failed: ${e.message}`);
+          return NextResponse.json({ result: { success: false, log, error: e.message } });
+        }
+      }
 
       default:
         return NextResponse.json({ error: `Unknown agent: ${agent}` }, { status: 400 });
