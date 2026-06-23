@@ -409,14 +409,9 @@ async function autonomousPublish(product: any): Promise<any> {
     imageGenerated = true;
   } catch (e: any) { console.error("Image failed:", e.message); }
 
-  // Generate real HTML product using AI Asset Sprint pipeline
-  let fileUploaded = false;
-  try {
-    const htmlContent = await generateAssetHTML(product.title, product.category || "digital products");
-    const filename = product.title.slice(0, 40).replace(/[^a-z0-9]/gi, "_").toLowerCase() + ".html";
-    await uploadHTMLToEtsy(listingId, htmlContent, filename, token);
-    fileUploaded = true;
-  } catch (e: any) { console.error("HTML product failed:", e.message); }
+// HTML product generated separately to avoid timeout
+  const fileUploaded = false;
+ 
 
   let status = "draft";
   if (imageGenerated) {
