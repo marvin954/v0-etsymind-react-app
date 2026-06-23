@@ -281,8 +281,7 @@ async function autonomousPublish(product: any): Promise<any> {
   } catch (e: any) { console.error("Image failed:", e.message); }
 
   // PDF generation skipped in pipeline (timeout) — use fix_images agent separately
-  const fileUploaded = false;
-
+ 
   let status = "draft";
   if (imageGenerated) {
     try { await activateListing(listingId, token); status = "active"; }
