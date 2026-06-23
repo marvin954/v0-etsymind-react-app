@@ -23,6 +23,86 @@ async function getValidToken(): Promise<string> {
   return data.access_token;
 }
 
+
+// ─── PRODUCT QUEUE (Supabase) ─────────────────────────────────────────────────
+const SB_URL = () => process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SB_KEY = () => process.env.SUPABASE_SERVICE_ROLE_KEY! || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+async function sbGet(table: string, filter = "") {
+  const res = await fetch(`${SB_URL()}/rest/v1/${table}?${filter}&order=created_at.asc`, {
+    headers: { "apikey": SB_KEY(), "Authorization": `Bearer ${SB_KEY()}` },
+  });
+  return res.json();
+}
+
+async function sbInsert(table: string, row: object) {
+  const res = await fetch(`${SB_URL()}/rest/v1/${table}`, {
+    method: "POST",
+    headers: { "apikey": SB_KEY(), "Authorization": `Bearer ${SB_KEY()}`, "Content-Type": "application/json", "Prefer": "return=representation" },
+    body: JSON.stringify(row),
+  });
+  return res.json();
+}
+
+async function sbUpdate(table: string, updates: object, filter: string) {
+  const res = await fetch(`${SB_URL()}/rest/v1/${table}?${filter}`, {
+    method: "PATCH",
+    headers: { "apikey": SB_KEY(), "Authorization": `Bearer ${SB_KEY()}`, "Content-Type": "application/json", "Prefer": "return=minimal" },
+    body: JSON.stringify(updates),
+  });
+  return res.ok;
+}
+
+async function queueProducts(products: any[]) {
+  const results = [];
+  for (const p of products) {
+    try {
+      const row = await sbInsert("product_queue", {
+        title: p.title,
+        description: p.description,
+        tags: p.tags,
+        price: p.price,
+        design_brief: p.design_brief,
+        status: "pending",
+        created_at: new Date().toISOString(),
+      });
+      results.push(row);
+    } catch(e: any) { console.error("Queue insert failed:", e.message); }
+  }
+  return results;
+}
+
+async function processNextQueued(): Promise<any> {
+  const rows = await sbGet("product_queue", "status=eq.pending&limit=1");
+  if (!Array.isArray(rows) || !rows.length) return { message: "Queue is empty" };
+  const item = rows[0];
+
+  // Mark as processing
+  await sbUpdate("product_queue", { status: "processing" }, `id=eq.${item.id}`);
+
+  try {
+    const result = await autonomousPublish(item);
+    await sbUpdate("product_queue", { status: "published", listing_id: result.listing_id, published_at: new Date().toISOString() }, `id=eq.${item.id}`);
+    return { ...result, queued_id: item.id };
+  } catch(e: any) {
+    await sbUpdate("product_queue", { status: "failed", error: e.message }, `id=eq.${item.id}`);
+    throw e;
+  }
+}
+
+async function getQueueStatus(): Promise<any> {
+  const all = await sbGet("product_queue", "limit=50");
+  if (!Array.isArray(all)) return { pending: 0, published: 0, failed: 0, items: [] };
+  return {
+    pending: all.filter((r: any) => r.status === "pending").length,
+    processing: all.filter((r: any) => r.status === "processing").length,
+    published: all.filter((r: any) => r.status === "published").length,
+    failed: all.filter((r: any) => r.status === "failed").length,
+    items: all.slice(0, 10),
+  };
+}
+
+
 function etsyHeaders(token: string) {
   return {
     "Content-Type": "application/json",
@@ -269,18 +349,30 @@ async function runFullPipeline(niche?: string): Promise<any> {
   log.push(`Created ${products.length} products`);
 
   const published = [];
-  for (const product of products.slice(0, 1)) {
-    log.push(`Publishing: ${product.title.slice(0, 50)}...`);
+
+  // Publish first product immediately
+  const first = products[0];
+  log.push(`Publishing: ${first.title.slice(0, 50)}...`);
+  try {
+    const result = await autonomousPublish(first);
+    published.push(result);
+    log.push(`✓ ${result.status}: ${result.url}`);
+  } catch (e: any) {
+    log.push(`✗ Failed: ${e.message}`);
+  }
+
+  // Queue remaining 2 for later
+  const remaining = products.slice(1);
+  if (remaining.length > 0) {
     try {
-      const result = await autonomousPublish(product);
-      published.push(result);
-      log.push(`✓ ${result.status}: ${result.url}`);
-    } catch (e: any) {
-      log.push(`✗ Failed: ${e.message}`);
+      await queueProducts(remaining);
+      log.push(`📋 ${remaining.length} products added to queue — run PROCESS QUEUE to publish`);
+    } catch(e: any) {
+      log.push(`Queue failed: ${e.message}`);
     }
   }
 
-  return { log, published, total: published.length };
+  return { log, published, total: published.length, queued: remaining.length };
 }
 
 // ─── ROUTE HANDLER ────────────────────────────────────────────────────────────
@@ -343,6 +435,12 @@ export async function POST(req: NextRequest) {
         );
         return NextResponse.json({ result });
       }
+
+      case "process_queue":
+        return NextResponse.json({ result: await processNextQueued() });
+
+      case "queue_status":
+        return NextResponse.json({ result: await getQueueStatus() });
 
       default:
         return NextResponse.json({ error: `Unknown agent: ${agent}` }, { status: 400 });
