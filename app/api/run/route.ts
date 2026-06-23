@@ -402,7 +402,6 @@ async function autonomousPublish(product: any): Promise<any> {
   const listingId = listing.listing_id;
 
   let imageGenerated = false;
-  let fileUploaded = false;
 
   try {
     const imgBuf = await generateMockupImage(product.title, product.design_brief || product.title);
