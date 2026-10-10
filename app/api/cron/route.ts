@@ -12,8 +12,10 @@ export const maxDuration = 300; // 5 min max
 
 export async function GET(req: NextRequest) {
   // Verify cron secret so it can only be triggered by Vercel
+  // An unset CRON_SECRET would otherwise accept "Bearer undefined".
+  const secret = process.env.CRON_SECRET;
   const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!secret || authHeader !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

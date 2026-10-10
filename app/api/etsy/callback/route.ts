@@ -9,6 +9,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error || "No code received" }, { status: 400 });
   }
 
+  // Only finish a login this browser started from /api/etsy/auth.
+  const [expectedState, codeVerifier] = (req.cookies.get("etsy_oauth")?.value || "").split(".");
+  if (!expectedState || !codeVerifier || searchParams.get("state") !== expectedState) {
+    return NextResponse.json({ error: "Login expired or did not start here. Visit /api/etsy/auth again." }, { status: 400 });
+  }
+
   try {
     const res = await fetch("https://api.etsy.com/v3/public/oauth/token", {
       method: "POST",
@@ -18,7 +24,7 @@ export async function GET(req: NextRequest) {
         client_id: process.env.ETSY_API_KEY!,
         redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/etsy/callback`,
         code,
-        code_verifier: "b_weHkn29GS8JVgHaKxCvEBFXO4zh73MFdoyBGEaHSk",
+        code_verifier: codeVerifier,
       }),
     });
 
@@ -49,9 +55,9 @@ export async function GET(req: NextRequest) {
     }
 
     // Redirect to app with success
-    return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}?etsy=connected`
-    );
+    const done = NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}?etsy=connected`);
+    done.cookies.delete({ name: "etsy_oauth", path: "/api/etsy/callback" });
+    return done;
   } catch (e: unknown) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Unknown error" },
