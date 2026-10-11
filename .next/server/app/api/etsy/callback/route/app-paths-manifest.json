@@ -1,0 +1,3 @@
+{
+  "/api/etsy/callback/route": "app/api/etsy/callback/route.js"
+}
