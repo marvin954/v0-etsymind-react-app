@@ -1,137 +1,142 @@
-// lib/agents.ts — Hermes LLM bridge
-// All 6 agents (market research, SEO, product creator, listing manager, pricing, analytics)
-// use direct fetch() to the Hermes proxy
+// All agent calls go through /api/agent — key stays server-side
 
-import { callHermes, ClaudeMessage } from './claude';
-
-export interface AgentOptions {
-  model?: string;
-  temperature?: number;
-  max_tokens?: number;
-}
-
-const DEFAULT_MODEL = 'hermes-3-mini-128k';
-const DEFAULT_TEMPERATURE = 0.7;
-const DEFAULT_MAX_TOKENS = 2048;
-
-// API proxy helper
-async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'AI-Proxy-KEY': process.env.AI_PROXY_KEY || process.env.HERMES_API_KEY || 'default-key',
-      'AI-Proxy-Version': '2024-06-01',
-      ...options?.headers,
-    },
+async function callAgent(
+  systemPrompt: string,
+  userPrompt: string,
+  jsonMode = false
+) {
+  const res = await fetch("/api/agent", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ systemPrompt, userPrompt, jsonMode }),
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`API error ${response.status}: ${errorText}`);
-  }
-
-  return response.json();
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data.result;
 }
 
-// Market research agent
-export async function marketResearch(productName: string, targetAudience: string, model: string = DEFAULT_MODEL): Promise<any> {
-  const messages: ClaudeMessage[] = [
-    {
-      role: 'system',
-      content: 'You are a market research expert. Analyze the product and provide insights.',
-    },
-    {
-      role: 'user',
-      content: `Product: ${productName}. Target audience: ${targetAudience}. Provide market analysis, trends, and recommendations.`,
-    },
-  ];
+// ── ORCHESTRATOR ────────────────────────────────────────────
+export async function runOrchestrator(storeState: object, userGoal: string) {
+  return callAgent(
+    `You are the Orchestrator AI for an autonomous Etsy store. You coordinate 5 specialist agents: Market Researcher, Product Creator, Listing Manager, Customer Service, Analytics Agent. You receive the current store state and a goal, then output a JSON action plan.`,
+    `Store state: ${JSON.stringify(storeState, null, 2)}
+User goal: "${userGoal}"
 
-  const response = await callHermes({ model, messages, temperature: DEFAULT_TEMPERATURE, max_tokens: DEFAULT_MAX_TOKENS });
-  return response.choices[0]?.message?.content || '';
+Output JSON:
+{
+  "strategy": "brief overall strategy",
+  "tasks": [
+    { "agent": "researcher|creator|listing|customer|analytics", "task": "specific task description", "priority": "high|medium|low" }
+  ],
+  "reasoning": "why this plan"
+}`,
+    true
+  );
 }
 
-// SEO agent
-export async function seo(content: string, model: string = DEFAULT_MODEL): Promise<any> {
-  const messages: ClaudeMessage[] = [
-    {
-      role: 'system',
-      content: 'You are an SEO expert. Optimize content for search engines.',
-    },
-    {
-      role: 'user',
-      content: content,
-    },
-  ];
+// ── MARKET RESEARCHER ───────────────────────────────────────
+export async function runResearcher(niche: string, existingProducts: string[]) {
+  return callAgent(
+    `You are a Market Research AI agent for an Etsy store. You analyze market trends, competition, and product opportunities. Output actionable JSON insights.`,
+    `Research niche: "${niche}"
+Existing products: ${JSON.stringify(existingProducts)}
 
-  const response = await callHermes({ model, messages, temperature: DEFAULT_TEMPERATURE, max_tokens: DEFAULT_MAX_TOKENS });
-  return response.choices[0]?.message?.content || '';
+Output JSON:
+{
+  "trending_keywords": ["keyword1","keyword2","keyword3","keyword4","keyword5"],
+  "product_opportunities": [
+    { "product": "product name", "reason": "why it sells", "estimated_price": "$X-$Y", "competition": "low|medium|high", "demand": "low|medium|high" }
+  ],
+  "competitor_insights": "brief competitor landscape",
+  "recommended_focus": "what to create next and why"
+}`,
+    true
+  );
 }
 
-// Product creator agent
-export async function productCreator(idea: string, model: string = DEFAULT_MODEL): Promise<any> {
-  const messages: ClaudeMessage[] = [
-    {
-      role: 'system',
-      content: 'You are a product creator expert.',
-    },
-    {
-      role: 'user',
-      content: idea,
-    },
-  ];
+// ── PRODUCT CREATOR ─────────────────────────────────────────
+export async function runCreator(productIdea: string, targetKeywords: string[]) {
+  return callAgent(
+    `You are a Product Creator AI for an Etsy digital products store. You create complete product listings with compelling copy, SEO-optimized titles, and strategic tags. Output ready-to-publish JSON.`,
+    `Product idea: "${productIdea}"
+Target keywords: ${JSON.stringify(targetKeywords)}
 
-  const response = await callHermes({ model, messages, temperature: DEFAULT_TEMPERATURE, max_tokens: DEFAULT_MAX_TOKENS });
-  return response.choices[0]?.message?.content || '';
+Output JSON:
+{
+  "title": "SEO-optimized Etsy listing title (max 140 chars)",
+  "description": "compelling 3-paragraph product description",
+  "tags": ["tag1","tag2","tag3","tag4","tag5","tag6","tag7","tag8","tag9","tag10","tag11","tag12","tag13"],
+  "price": "suggested price in USD",
+  "category": "Etsy category",
+  "files_included": ["file1.pdf", "file2.pdf"],
+  "mockup_prompt": "detailed image prompt for product mockup"
+}`,
+    true
+  );
 }
 
-// Listing manager agent
-export async function listingManager(listing: string, model: string = DEFAULT_MODEL): Promise<any> {
-  const messages: ClaudeMessage[] = [
-    {
-      role: 'system',
-      content: 'You are a listing manager expert.',
-    },
-    {
-      role: 'user',
-      content: listing,
-    },
-  ];
+// ── LISTING MANAGER ─────────────────────────────────────────
+export async function runListingManager(product: object, storeMetrics: object) {
+  return callAgent(
+    `You are a Listing Manager AI for an Etsy store. You optimize listings for maximum visibility and conversion.`,
+    `Product listing: ${JSON.stringify(product)}
+Store metrics: ${JSON.stringify(storeMetrics)}
 
-  const response = await callHermes({ model, messages, temperature: DEFAULT_TEMPERATURE, max_tokens: DEFAULT_MAX_TOKENS });
-  return response.choices[0]?.message?.content || '';
+Output JSON:
+{
+  "seo_score": 85,
+  "optimizations": ["specific improvement 1", "specific improvement 2", "specific improvement 3"],
+  "price_recommendation": "$X.XX",
+  "title_variant": "alternative title to A/B test",
+  "top_tags_to_add": ["tag1","tag2"],
+  "listing_status": "ready|needs_work",
+  "predicted_monthly_sales": "X-Y units"
+}`,
+    true
+  );
 }
 
-// Pricing agent
-export async function pricing(product: string, model: string = DEFAULT_MODEL): Promise<any> {
-  const messages: ClaudeMessage[] = [
-    {
-      role: 'system',
-      content: 'You are a pricing expert.',
-    },
-    {
-      role: 'user',
-      content: product,
-    },
-  ];
+// ── CUSTOMER SERVICE ────────────────────────────────────────
+export async function runCustomerService(
+  messages: object[],
+  orderHistory: object
+) {
+  return callAgent(
+    `You are a Customer Service AI for an Etsy digital products store. You handle customer inquiries with warmth and efficiency.`,
+    `Customer messages: ${JSON.stringify(messages)}
+Order history context: ${JSON.stringify(orderHistory)}
 
-  const response = await callHermes({ model, messages, temperature: DEFAULT_TEMPERATURE, max_tokens: DEFAULT_MAX_TOKENS });
-  return response.choices[0]?.message?.content || '';
+Output JSON:
+{
+  "responses": [
+    { "to": "customer name", "subject": "Re: their issue", "message": "professional friendly response", "action": "resolve|escalate|refund|follow_up" }
+  ],
+  "review_requests": ["order IDs to request reviews from"],
+  "flagged_issues": ["any patterns or problems to note"],
+  "satisfaction_score": 9.2
+}`,
+    true
+  );
 }
 
-// Analytics agent
-export async function analytics(data: string, model: string = DEFAULT_MODEL): Promise<any> {
-  const messages: ClaudeMessage[] = [
-    {
-      role: 'system',
-      content: 'You are an analytics expert.',
-    },
-    {
-      role: 'user',
-      content: data,
-    },
-  ];
+// ── ANALYTICS ───────────────────────────────────────────────
+export async function runAnalytics(salesData: object, listings: object[]) {
+  return callAgent(
+    `You are an Analytics AI for an Etsy store. You analyze sales performance, identify trends, and provide data-driven recommendations.`,
+    `Sales data: ${JSON.stringify(salesData)}
+Listings: ${JSON.stringify(listings)}
 
-  const response = await callHermes({ model, messages, temperature: DEFAULT_TEMPERATURE, max_tokens: DEFAULT_MAX_TOKENS });
-  return response.choices[0]?.message?.content || '';
+Output JSON:
+{
+  "revenue_this_month": "$X,XXX",
+  "revenue_trend": "+X%",
+  "top_performers": [{ "product": "name", "units": 0, "revenue": "$XXX" }],
+  "underperformers": [{ "product": "name", "issue": "why underperforming", "action": "recommended fix" }],
+  "conversion_rate": "X.X%",
+  "key_insights": ["insight 1", "insight 2", "insight 3"],
+  "next_actions": ["action 1", "action 2"]
+}`,
+    true
+  );
 }

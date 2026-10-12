@@ -1,0 +1,124 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #070707;
+  --foreground: #e8e8e8;
+  --card: #0e0e0e;
+  --card-foreground: #e8e8e8;
+  --popover: #0e0e0e;
+  --popover-foreground: #e8e8e8;
+  --primary: #FB5607;
+  --primary-foreground: #ffffff;
+  --secondary: #111111;
+  --secondary-foreground: #888888;
+  --muted: #1a1a1a;
+  --muted-foreground: #555555;
+  --accent: #F4A261;
+  --accent-foreground: #070707;
+  --destructive: #f87171;
+  --destructive-foreground: #ffffff;
+  --border: #222222;
+  --input: #1e1e1e;
+  --ring: #FB5607;
+  --chart-1: #FB5607;
+  --chart-2: #F4A261;
+  --chart-3: #E76F51;
+  --chart-4: #2A9D8F;
+  --chart-5: #457B9D;
+  --radius: 0.75rem;
+  --sidebar: #0b0b0b;
+  --sidebar-foreground: #e8e8e8;
+  --sidebar-primary: #FB5607;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1e1e1e;
+  --sidebar-accent-foreground: #e8e8e8;
+  --sidebar-border: #1a1a1a;
+  --sidebar-ring: #FB5607;
+  
+  /* Agent colors */
+  --agent-orchestrator: #FB5607;
+  --agent-researcher: #F4A261;
+  --agent-creator: #E76F51;
+  --agent-listing: #2A9D8F;
+  --agent-customer: #457B9D;
+  --agent-analytics: #8338EC;
+  --success: #4ade80;
+  --warning: #fbbf24;
+}
+
+@theme inline {
+  --font-sans: var(--font-dm-sans), 'Geist', 'Geist Fallback';
+  --font-heading: var(--font-syne), 'Syne', sans-serif;
+  --font-mono: var(--font-space-mono), 'Geist Mono', 'Geist Mono Fallback';
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-agent-orchestrator: var(--agent-orchestrator);
+  --color-agent-researcher: var(--agent-researcher);
+  --color-agent-creator: var(--agent-creator);
+  --color-agent-listing: var(--agent-listing);
+  --color-agent-customer: var(--agent-customer);
+  --color-agent-analytics: var(--agent-analytics);
+}
+
+@keyframes dot {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
