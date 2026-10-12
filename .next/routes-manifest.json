@@ -1,0 +1,135 @@
+{
+  "version": 3,
+  "pages404": true,
+  "appType": "app",
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "priority": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "onMatchHeaders": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_global-error",
+      "regex": "^/_global\\-error(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_global\\-error(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/api/agent",
+      "regex": "^/api/agent(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/agent(?:/)?$"
+    },
+    {
+      "page": "/api/cron",
+      "regex": "^/api/cron(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cron(?:/)?$"
+    },
+    {
+      "page": "/api/db",
+      "regex": "^/api/db(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/db(?:/)?$"
+    },
+    {
+      "page": "/api/email",
+      "regex": "^/api/email(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/email(?:/)?$"
+    },
+    {
+      "page": "/api/etsy/auth",
+      "regex": "^/api/etsy/auth(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/etsy/auth(?:/)?$"
+    },
+    {
+      "page": "/api/etsy/callback",
+      "regex": "^/api/etsy/callback(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/etsy/callback(?:/)?$"
+    },
+    {
+      "page": "/api/etsy/listings",
+      "regex": "^/api/etsy/listings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/etsy/listings(?:/)?$"
+    },
+    {
+      "page": "/api/etsy/revenue",
+      "regex": "^/api/etsy/revenue(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/etsy/revenue(?:/)?$"
+    },
+    {
+      "page": "/api/image",
+      "regex": "^/api/image(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/image(?:/)?$"
+    },
+    {
+      "page": "/api/models",
+      "regex": "^/api/models(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/models(?:/)?$"
+    },
+    {
+      "page": "/api/run",
+      "regex": "^/api/run(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/run(?:/)?$"
+    },
+    {
+      "page": "/claude/agent",
+      "regex": "^/claude/agent(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/claude/agent(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments",
+    "clientParamParsing": false,
+    "dynamicRSCPrerender": false
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

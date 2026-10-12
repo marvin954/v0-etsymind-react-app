@@ -1,0 +1,17 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/api/agent/route": "/api/agent",
+  "/api/cron/route": "/api/cron",
+  "/api/db/route": "/api/db",
+  "/api/email/route": "/api/email",
+  "/api/etsy/auth/route": "/api/etsy/auth",
+  "/api/etsy/callback/route": "/api/etsy/callback",
+  "/api/etsy/listings/route": "/api/etsy/listings",
+  "/api/etsy/revenue/route": "/api/etsy/revenue",
+  "/api/image/route": "/api/image",
+  "/api/models/route": "/api/models",
+  "/api/run/route": "/api/run",
+  "/claude/agent/route": "/claude/agent",
+  "/page": "/"
+}
