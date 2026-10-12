@@ -4,5 +4,9 @@
       "path": "/api/cron",
       "schedule": "0 9 * * *"
     }
-  ]
+  ],
+  "buildCommand": "next build",
+  "devCommand": "next dev",
+  "outputDirectory": ".next",
+  "framework": "nextjs"
 }
