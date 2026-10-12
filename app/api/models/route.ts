@@ -25,34 +25,18 @@ export async function GET(request: NextRequest) {
       const data = await res.json();
       const models = data.data || [];
 
-      // Filter to Hermes free models
-      const free = models
+      // Return array of strings
+      const hermes = models
         .filter((m: any) => m.owned_by === "NousResearch" || m.id.includes("hermes"))
-        .map((m: any) => ({
-          id: m.id,
-          label: m.name || m.id,
-          free: true,
-        }));
+        .map((m: any) => m.id);
 
-      return NextResponse.json({ models: [...free, ...HERMES_FREE_MODELS] });
+      return NextResponse.json([...hermes, ...HERMES_FREE_MODELS]);
     }
 
     // Fallback to known free models
-    return NextResponse.json({
-      models: [
-        ...HERMES_FREE_MODELS,
-        { id: "upstage/solar-mini4", label: "Solar Mini 4", free: true },
-        { id: "upstage/solar-pro4", label: "Solar Pro 4", free: true },
-      ],
-    });
+    return NextResponse.json([...HERMES_FREE_MODELS]);
   } catch {
     // Fallback
-    return NextResponse.json({
-      models: [
-        ...HERMES_FREE_MODELS,
-        { id: "upstage/solar-mini4", label: "Solar Mini 4", free: true },
-        { id: "upstage/solar-pro4", label: "Solar Pro 4", free: true },
-      ],
-    });
+    return NextResponse.json([...HERMES_FREE_MODELS]);
   }
 }
