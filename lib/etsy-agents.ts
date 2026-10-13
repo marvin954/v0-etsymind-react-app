@@ -1,41 +1,10 @@
-import { 
-  StoreState, 
-  OrchestratorResult, 
-  ResearchResult, 
-  CreatorResult, 
-  ListingResult, 
-  CxResult, 
-  AnalyticsResult,
-  Listing,
-  Message,
-  SalesData
-} from "./etsy-types";
-
-async function callClaude<T>(
-  systemPrompt: string, 
-  userPrompt: string, 
-  jsonMode = false
-): Promise<T> {
-  const response = await fetch("/api/claude", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ systemPrompt, userPrompt, jsonMode }),
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok || data.error) {
-    throw new Error(data.error || "API request failed");
-  }
-  
-  return data.result;
-}
+import { StoreState, AgentId, AGENT_META } from "./etsy-types";
+import { callAgent } from "./agents";
 
 export const Agents = {
-  async orchestrator(storeState: StoreState, userGoal: string): Promise<OrchestratorResult> {
-    return callClaude<OrchestratorResult>(
-      `You are the Orchestrator AI for an autonomous Etsy store. You coordinate 5 specialist agents: Market Researcher, Product Creator, Listing Manager, Customer Service, Analytics Agent. 
-You receive the current store state and a goal, then output a JSON action plan.`,
+  async orchestrator(storeState: StoreState, userGoal: string) {
+    return callAgent(
+      `You are the Orchestrator AI for an autonomous Etsy store. You coordinate 5 specialist agents: Market Researcher, Product Creator, Listing Manager, Customer Service, Analytics Agent. You receive the current store state and a goal, then output a JSON action plan.`,
       `Store state: ${JSON.stringify(storeState, null, 2)}
 User goal: "${userGoal}"
 
@@ -51,8 +20,8 @@ Output JSON:
     );
   },
 
-  async researcher(niche: string, existingProducts: string[]): Promise<ResearchResult> {
-    return callClaude<ResearchResult>(
+  async researcher(niche: string, existingProducts: string[]) {
+    return callAgent(
       `You are a Market Research AI agent for an Etsy store. You analyze market trends, competition, and product opportunities. Output actionable JSON insights.`,
       `Research niche: "${niche}"
 Existing products: ${JSON.stringify(existingProducts)}
@@ -70,8 +39,8 @@ Output JSON:
     );
   },
 
-  async creator(productIdea: string, targetKeywords: string[]): Promise<CreatorResult> {
-    return callClaude<CreatorResult>(
+  async creator(productIdea: string, targetKeywords: string[]) {
+    return callAgent(
       `You are a Product Creator AI for an Etsy digital products store. You create complete product listings with compelling copy, SEO-optimized titles, and strategic tags. Output ready-to-publish JSON.`,
       `Product idea: "${productIdea}"
 Target keywords: ${JSON.stringify(targetKeywords)}
@@ -90,9 +59,9 @@ Output JSON:
     );
   },
 
-  async listing(product: CreatorResult | Listing, storeMetrics: SalesData): Promise<ListingResult> {
-    return callClaude<ListingResult>(
-      `You are a Listing Manager AI for an Etsy store. You optimize listings for maximum visibility and conversion. Analyze and suggest improvements.`,
+  async listing(product: object, storeMetrics: object) {
+    return callAgent(
+      `You are a Listing Manager AI for an Etsy store. You optimize listings for maximum visibility and conversion.`,
       `Product listing: ${JSON.stringify(product)}
 Store metrics: ${JSON.stringify(storeMetrics)}
 
@@ -110,9 +79,9 @@ Output JSON:
     );
   },
 
-  async customer(messages: Message[], orderHistory: SalesData): Promise<CxResult> {
-    return callClaude<CxResult>(
-      `You are a Customer Service AI for an Etsy digital products store. You handle customer inquiries with warmth and efficiency. Draft professional responses and flag issues.`,
+  async customer(messages: object[], orderHistory: object) {
+    return callAgent(
+      `You are a Customer Service AI for an Etsy digital products store. You handle customer inquiries with warmth and efficiency.`,
       `Customer messages: ${JSON.stringify(messages)}
 Order history context: ${JSON.stringify(orderHistory)}
 
@@ -129,8 +98,8 @@ Output JSON:
     );
   },
 
-  async analytics(salesData: SalesData, listings: Listing[]): Promise<AnalyticsResult> {
-    return callClaude<AnalyticsResult>(
+  async analytics(salesData: object, listings: object[]) {
+    return callAgent(
       `You are an Analytics AI for an Etsy store. You analyze sales performance, identify trends, and provide data-driven recommendations.`,
       `Sales data: ${JSON.stringify(salesData)}
 Listings: ${JSON.stringify(listings)}
@@ -139,7 +108,7 @@ Output JSON:
 {
   "revenue_this_month": "$X,XXX",
   "revenue_trend": "+X%",
-  "top_performers": [{ "product": "name", "units": X, "revenue": "$XXX" }],
+  "top_performers": [{ "product": "name", "units": 0, "revenue": "$XXX" }],
   "underperformers": [{ "product": "name", "issue": "why underperforming", "action": "recommended fix" }],
   "conversion_rate": "X.X%",
   "key_insights": ["insight 1", "insight 2", "insight 3"],

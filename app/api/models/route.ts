@@ -11,7 +11,6 @@ const HERMES_FREE_MODELS = [
 ];
 
 export async function GET(request: NextRequest) {
-  // Fetch from inference-api to get the actual list
   try {
     const res = await fetch("https://inference-api.nousresearch.com/v1/models", {
       headers: {
@@ -24,19 +23,13 @@ export async function GET(request: NextRequest) {
     if (res.ok) {
       const data = await res.json();
       const models = data.data || [];
-
-      // Return array of strings
       const hermes = models
         .filter((m: any) => m.owned_by === "NousResearch" || m.id.includes("hermes"))
         .map((m: any) => m.id);
-
       return NextResponse.json([...hermes, ...HERMES_FREE_MODELS]);
     }
-
-    // Fallback to known free models
     return NextResponse.json([...HERMES_FREE_MODELS]);
   } catch {
-    // Fallback
     return NextResponse.json([...HERMES_FREE_MODELS]);
   }
 }
