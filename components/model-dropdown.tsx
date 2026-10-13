@@ -19,7 +19,7 @@ export default function ModelDropdown({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/Models")
+    fetch("/api/models")
       .then((res) => res.json())
       .then((data) => {
         const modelList = data.models || [];
