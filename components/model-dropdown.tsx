@@ -22,11 +22,12 @@ export default function ModelDropdown({
     fetch("/api/models")
       .then((res) => res.json())
       .then((data) => {
-        const modelList = data.models || [];
+        // Data is a plain array of strings now
+        const modelList = data || [];
         const options = modelList.map((m: any) => ({
           id: m,
           label: m,
-          free: !m.includes("/") || m.includes("free"),
+          free: !m.includes("/"),
         }));
         setModels(options);
         if (options.some((o) => o.id === value)) {
